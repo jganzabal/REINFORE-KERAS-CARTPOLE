@@ -143,12 +143,13 @@ def score_model(model, env, num_tests, render=False):
     env.close()
     return np.mean(scores)
 
-def run_episode(env, model, greedy=False, gamma=.99):
+def run_episode(env, model, greedy=False, gamma=.99, get_probs=False):
     in_dimen = model.input_shape[1]
     out_dimen = model.output_shape[1]
     states = np.empty(0).reshape(0, in_dimen)
     actions = np.empty(0).reshape(0,1)
     rewards = np.empty(0).reshape(0,1)
+    probs = []
     reward_sum = 0
     observation = env.reset()
     done = False
@@ -157,6 +158,7 @@ def run_episode(env, model, greedy=False, gamma=.99):
         state = np.reshape(observation, [1, in_dimen])
 
         predict = model.predict([state])[0]
+        probs.append(predict)
         if greedy:
             action = np.argmax(predict)
         else:
@@ -171,7 +173,10 @@ def run_episode(env, model, greedy=False, gamma=.99):
         observation, reward, done, _ = env.step(action)
         reward_sum += reward
         rewards = np.vstack([rewards, reward])
-    return states, actions, rewards, reward_sum, discount_rewards(rewards, gamma)
+    if get_probs:
+        return states, actions, rewards, reward_sum, discount_rewards(rewards, gamma), probs
+    else:
+        return states, actions, rewards, reward_sum, discount_rewards(rewards, gamma)
 
 def apply_baselines(discounted_rewards):
     discounted_rewards_unbiased = discounted_rewards - discounted_rewards.mean()
