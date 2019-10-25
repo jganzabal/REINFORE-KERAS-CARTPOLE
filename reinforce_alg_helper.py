@@ -54,18 +54,24 @@ def get_observations_stats(env, run_episode, N=5000, plot_it=True):
     actions = np.empty(0).reshape(0,1)
     states = np.empty(0).reshape(0,states_dim)
     rewards = []
+    discounted_rewards_array = np.empty(0).reshape(0,1)
     for i in range(N):
         state, action, reward, reward_sum, discounted_rewards = run_episode(env)
-        rewards.append(np.sum(reward))
+        rewards.append(reward_sum)
         states = np.vstack([states, state])
         actions = np.vstack([actions, action])
+        discounted_rewards_array = np.vstack([discounted_rewards_array, np.array(discounted_rewards).reshape(-1,1)])
     if plot_it:
-        f, ax = plt.subplots(2,2, figsize=(20,10))
+        f, ax = plt.subplots(3,2, figsize=(20,10))
         ax = ax.flatten()
         titles = ['positions_of_cart', 'velocities_of_cart', 'angles_of_pole', 'rotation_rates_of_pole']
         for i in range(states_dim):
             ax[i].hist(states[:,i], 40)
             ax[i].set_title(titles[i])
+        ax[4].hist(rewards, 40)
+        ax[4].set_title('rewards')
+        ax[5].hist(discounted_rewards_array, 40)
+        ax[5].set_title('discounted_rewards')
         print('Media de las acciones [0,1]:', np.mean(actions))
         print('Media de rewards:', np.mean(rewards))
         
@@ -100,7 +106,7 @@ def get_policy_model(env, hidden_layer_neurons, lr):
         # actual: 1 predict: 1 -> log(1 * (1 - 1) + (1 - 1) * (1 + 1)) = -inf
         # actual: 1 predict: 0 -> log(1 * (1 - 0) + (1 - 1) * (1 + 0)) = 0
         # actual: 0 predict: 1 -> log(0 * (0 - 1) + (1 - 0) * (0 + 1)) = 0
-        log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
+        log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred) + K.epsilon())
         # log_lik = categorical_crossentropy(y_true, y_pred)
         # log_lik = y_true*K.log(y_pred) + (1 - y_true) * K.log((1-y_pred))
         return K.mean(log_lik * adv, keepdims=True)
@@ -188,3 +194,16 @@ def actions_to_one_hot(actions, num_actions = 2):
     actions_train = np.zeros([len(actions), num_actions])
     actions_train[np.arange(len(actions)), actions] = 1
     return actions_train
+
+def get_batch_data(env, model, batch_size=50):
+    batch_states = np.empty(0).reshape(0,model.input_shape[1])
+    batch_actions = np.empty(0).reshape(0,1)
+    discounted_rewards = np.empty(0).reshape(0,1)
+    batch_probs = np.empty(0).reshape(0,2)
+    for i in range(batch_size):
+        states, actions, _, _, discounted_rewards_episode, probs= run_episode(env, model, get_probs=True)
+        discounted_rewards = np.vstack([discounted_rewards, discounted_rewards_episode])
+        batch_states = np.vstack([batch_states, states]) 
+        batch_actions = np.vstack([batch_actions, actions]) 
+        batch_probs = np.vstack([batch_probs, np.array(probs)])
+    return batch_states, batch_actions, discounted_rewards, batch_probs
