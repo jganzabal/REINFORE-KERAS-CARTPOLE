@@ -179,6 +179,7 @@ def run_episode(env, model, greedy=False, gamma=.99, get_probs=False):
         observation, reward, done, _ = env.step(action)
         reward_sum += reward
         rewards = np.vstack([rewards, reward])
+    probs = np.array(probs)
     if get_probs:
         return states, actions, rewards, reward_sum, discount_rewards(rewards, gamma), probs
     else:
